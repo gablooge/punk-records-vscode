@@ -18,8 +18,10 @@ try {
 const skip = available ? false : `no punk with --json at '${bin}' (set PUNK_BIN)`;
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "punk-vscode-"));
+// an empty file, not os.devNull: Git for Windows cannot read \\.\nul as a config file
+const emptyGitConfig = (dir: string) => { const f = path.join(dir, "gitconfig"); fs.writeFileSync(f, ""); return f; };
 const env = {
-  ...process.env, HOME: path.join(tmp, "home"), GIT_CONFIG_GLOBAL: os.devNull, GIT_CONFIG_NOSYSTEM: "1",
+  ...process.env, HOME: path.join(tmp, "home"), GIT_CONFIG_GLOBAL: emptyGitConfig(tmp), GIT_CONFIG_NOSYSTEM: "1",
   GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t",
 };
 const store = path.join(tmp, "store");

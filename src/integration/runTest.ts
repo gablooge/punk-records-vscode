@@ -11,7 +11,9 @@ async function main(): Promise<void> {
   for (const k of ["ELECTRON_RUN_AS_NODE", "VSCODE_IPC_HOOK_CLI", "VSCODE_PID"]) delete process.env[k];
   const bin = process.env.PUNK_BIN || "punk";
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "punk-vscode-it-"));
-  const env = { ...process.env, HOME: path.join(tmp, "home"), GIT_CONFIG_GLOBAL: os.devNull, GIT_CONFIG_NOSYSTEM: "1",
+  // an empty file, not os.devNull: Git for Windows cannot read \\.\nul as a config file
+  const emptyGitConfig = (dir: string) => { const f = path.join(dir, "gitconfig"); fs.writeFileSync(f, ""); return f; };
+  const env = { ...process.env, HOME: path.join(tmp, "home"), GIT_CONFIG_GLOBAL: emptyGitConfig(tmp), GIT_CONFIG_NOSYSTEM: "1",
     GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
   const run = (cmd: string, args: string[], cwd?: string) => execFileSync(cmd, args, { cwd, env, encoding: "utf8" });
   const store = path.join(tmp, "store");
