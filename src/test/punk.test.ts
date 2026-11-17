@@ -17,7 +17,7 @@ try {
 }
 const skip = available ? false : `no punk with --json at '${bin}' (set PUNK_BIN)`;
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "punk-vscode-"));
+const tmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "punk-vscode-"))); // long path: Windows tmpdir can be 8.3 (RUNNER~1), punk reports it resolved
 // an empty file, not os.devNull: Git for Windows cannot read \\.\nul as a config file
 const emptyGitConfig = (dir: string) => { const f = path.join(dir, "gitconfig"); fs.writeFileSync(f, ""); return f; };
 const env = {

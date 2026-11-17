@@ -10,7 +10,7 @@ async function main(): Promise<void> {
   // Run from a VS Code terminal, these make the downloaded VS Code start as plain Node instead.
   for (const k of ["ELECTRON_RUN_AS_NODE", "VSCODE_IPC_HOOK_CLI", "VSCODE_PID"]) delete process.env[k];
   const bin = process.env.PUNK_BIN || "punk";
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "punk-vscode-it-"));
+  const tmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "punk-vscode-it-"))); // long path: Windows tmpdir can be 8.3 (RUNNER~1), punk reports it resolved
   // an empty file, not os.devNull: Git for Windows cannot read \\.\nul as a config file
   const emptyGitConfig = (dir: string) => { const f = path.join(dir, "gitconfig"); fs.writeFileSync(f, ""); return f; };
   const env = { ...process.env, HOME: path.join(tmp, "home"), GIT_CONFIG_GLOBAL: emptyGitConfig(tmp), GIT_CONFIG_NOSYSTEM: "1",
