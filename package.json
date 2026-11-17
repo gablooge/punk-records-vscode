@@ -1,0 +1,154 @@
+{
+  "name": "punk-records",
+  "displayName": "Punk Records",
+  "description": "Sync status, commands, conflict diffs and a memories sidebar for Punk Records (CLAUDE.md, AGENTS.md, napkins, rules across projects and machines).",
+  "version": "0.1.0",
+  "publisher": "gablooge",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gablooge/punk-records-vscode"
+  },
+  "homepage": "https://github.com/gablooge/punk-records",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "claude",
+    "agents",
+    "memory",
+    "CLAUDE.md",
+    "AGENTS.md",
+    "mcp"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "punkRecords.save",
+        "title": "Save memories",
+        "category": "Punk Records"
+      },
+      {
+        "command": "punkRecords.sync",
+        "title": "Sync",
+        "category": "Punk Records"
+      },
+      {
+        "command": "punkRecords.restore",
+        "title": "Restore memories",
+        "category": "Punk Records"
+      },
+      {
+        "command": "punkRecords.diff",
+        "title": "Compare with store",
+        "category": "Punk Records",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "punkRecords.dedupe",
+        "title": "Remove duplicate lines",
+        "category": "Punk Records"
+      },
+      {
+        "command": "punkRecords.refresh",
+        "title": "Refresh",
+        "category": "Punk Records",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "punkRecords.menu",
+        "title": "Show actions",
+        "category": "Punk Records"
+      },
+      {
+        "command": "punkRecords.open",
+        "title": "Open memory",
+        "category": "Punk Records"
+      },
+      {
+        "command": "punkRecords.showOutput",
+        "title": "Show output",
+        "category": "Punk Records"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "punkRecords.memories",
+          "name": "Punk Records"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "punkRecords.refresh",
+          "when": "view == punkRecords.memories",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "punkRecords.diff",
+          "when": "view == punkRecords.memories && viewItem == memory-local",
+          "group": "inline"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "punkRecords.open",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Punk Records",
+      "properties": {
+        "punkRecords.executable": {
+          "type": "string",
+          "default": "punk",
+          "markdownDescription": "The `punk` command, or its full path (e.g. from `which punk`)."
+        },
+        "punkRecords.home": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Store location (`PUNK_HOME`). Empty: punk's default, `~/.punk-records`."
+        },
+        "punkRecords.saveOnFileSave": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Run `punk save` for the project when you save one of its memory files."
+        },
+        "punkRecords.refreshSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 0,
+          "markdownDescription": "How often the status bar checks for changes (0: only after commands and saves)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -w -p .",
+    "test": "tsc -p . && node --test out/test/",
+    "package": "vsce package --no-dependencies",
+    "vscode:prepublish": "tsc -p .",
+    "test:vscode": "tsc -p . && node out/integration/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@types/vscode": "^1.95.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.1.1",
+    "typescript": "^7.0.2"
+  }
+}
