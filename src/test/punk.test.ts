@@ -84,3 +84,12 @@ test("an unknown JSON version is refused, not misread", { skip: process.platform
   fs.writeFileSync(fake, "#!/bin/sh\necho 'local changes: none'\n", { mode: 0o755 });
   await assert.rejects(new Punk(fake).status(), /did not return JSON; punk 0.4.0 or newer/);
 });
+
+test("a punk without --json says to upgrade", { skip: process.platform === "win32" ? "uses a POSIX shell script" : false }, async () => {
+  // what punk 0.3.1 and older print (argparse), exit code 2
+  const fake = path.join(tmp, "old-punk");
+  fs.writeFileSync(fake, "#!/bin/sh\necho 'usage: punk [-h] [--home HOME] [--version] command ...' >&2\n" +
+    "echo 'punk: error: unrecognized arguments: --json' >&2\nexit 2\n", { mode: 0o755 });
+  await assert.rejects(new Punk(fake).status(), (e: Error) =>
+    /punk 0\.4\.0 or newer is needed/.test(e.message) && /pipx upgrade punk-records/.test(e.message) && !/usage:/.test(e.message));
+});

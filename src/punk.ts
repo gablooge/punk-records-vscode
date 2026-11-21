@@ -87,6 +87,9 @@ export class Punk {
   private async json<T extends { version: number }>(args: string[]): Promise<T> {
     const r = await this.run([...args, "--json"]);
     if (r.code !== 0) {
+      if (/unrecognized arguments: --json/.test(r.stderr)) {
+        throw new PunkError(`punk ${args[0]} has no --json; punk 0.4.0 or newer is needed (pipx upgrade punk-records)`);
+      }
       throw new PunkError((r.stderr || r.stdout).trim().replace(/^punk: /, "") || `punk ${args[0]} failed`);
     }
     let data: T;
