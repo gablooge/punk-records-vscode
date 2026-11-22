@@ -11,8 +11,16 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read   # read the environments' protection rules
     steps:
       - uses: actions/checkout@v4
+      # Before anything is built: the repo is public and both publish environments need approval.
+      - name: Release preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: sh scripts/release-preflight.sh "$GITHUB_REPOSITORY" marketplace openvsx
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
