@@ -22,6 +22,10 @@ loaded.
 
 CI runs the unit tests on Linux, macOS and Windows, and the integration test and packaging on Linux.
 
+The README pictures (`docs/demo.gif`, `docs/overview.png`, `docs/diff.png`) are recorded by
+`npm run demo` (needs ffmpeg). It runs the extension in a throwaway HOME, store and VS Code profile
+under `/tmp/punk-demo`, so nothing from your machine appears in them. Rerun it when the UI changes.
+
 ## Rules
 
 - **No runtime dependencies.** The extension is packaged with `--no-dependencies`; it uses the VS

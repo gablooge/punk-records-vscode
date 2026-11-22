@@ -3,6 +3,8 @@
 Keeps an eye on [Punk Records](https://github.com/gablooge/punk-records), the store that persists and
 syncs your AI agent memories (`CLAUDE.md`, `AGENTS.md`, napkins, rules) across projects and machines.
 
+![Editing CLAUDE.md, comparing it with the store copy, and saving it from the status bar menu](https://raw.githubusercontent.com/gablooge/punk-records-vscode/main/docs/demo.gif)
+
 ## Features
 
 - **Status bar.** `✓ punk` when everything is saved and restored; otherwise how many memories wait to
@@ -15,6 +17,10 @@ syncs your AI agent memories (`CLAUDE.md`, `AGENTS.md`, napkins, rules) across p
   subscribe to (`punk subscribe`), read-only.
 - **Save on file save** (off by default): `punkRecords.saveOnFileSave` runs `punk save` for the
   project when you save one of its memory files.
+
+![The Punk Records view in the Explorer: tracked projects, global memories and a read-only team store](https://raw.githubusercontent.com/gablooge/punk-records-vscode/main/docs/overview.png)
+
+![Compare with store: the store copy next to the local CLAUDE.md, with the new line highlighted](https://raw.githubusercontent.com/gablooge/punk-records-vscode/main/docs/diff.png)
 
 ## Requirements
 

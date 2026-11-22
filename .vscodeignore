@@ -10,3 +10,5 @@ out/integration/**
 scripts/**
 CONTRIBUTING.md
 SECURITY.md
+out/demo/**
+docs/**
