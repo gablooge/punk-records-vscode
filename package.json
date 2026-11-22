@@ -30,6 +30,13 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Runs the punk command, which reads and writes memory files in your projects."
+    },
+    "virtualWorkspaces": false
+  },
   "contributes": {
     "commands": [
       {
@@ -116,12 +123,14 @@
         "punkRecords.executable": {
           "type": "string",
           "default": "punk",
-          "markdownDescription": "The `punk` command, or its full path (e.g. from `which punk`)."
+          "scope": "machine",
+          "markdownDescription": "The `punk` command, or its full path (e.g. from `which punk`). User settings only: a workspace cannot choose the program the extension runs."
         },
         "punkRecords.home": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Store location (`PUNK_HOME`). Empty: punk's default, `~/.punk-records`."
+          "scope": "machine",
+          "markdownDescription": "Store location (`PUNK_HOME`). Empty: punk's default, `~/.punk-records`. User settings only."
         },
         "punkRecords.saveOnFileSave": {
           "type": "boolean",

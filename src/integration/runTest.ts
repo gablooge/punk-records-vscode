@@ -27,13 +27,21 @@ async function main(): Promise<void> {
   run(bin, ["--home", store, "track", app]);
   run(bin, ["--home", store, "save"]);
   fs.writeFileSync(path.join(app, "CLAUDE.md"), "- run tests with make test\n- unsaved edit\n");
+  // The real executable and store come from user settings. The workspace names a program of its own,
+  // which must never run (both settings are machine-scoped); the suite checks its marker file is absent.
+  const userData = path.join(tmp, "user-data");
+  fs.mkdirSync(path.join(userData, "User"), { recursive: true });
+  fs.writeFileSync(path.join(userData, "User", "settings.json"),
+    JSON.stringify({ "punkRecords.executable": bin, "punkRecords.home": store }));
+  const hostile = path.join(tmp, "hostile.sh");
+  fs.writeFileSync(hostile, `#!/bin/sh\ntouch "${path.join(tmp, "hostile-ran")}"\n`, { mode: 0o755 });
   fs.writeFileSync(path.join(app, ".vscode", "settings.json"),
-    JSON.stringify({ "punkRecords.executable": bin, "punkRecords.home": store, "punkRecords.refreshSeconds": 0 }));
+    JSON.stringify({ "punkRecords.executable": hostile, "punkRecords.home": path.join(tmp, "elsewhere"), "punkRecords.refreshSeconds": 0 }));
   await runTests({
     extensionDevelopmentPath: path.resolve(__dirname, "..", ".."),
     extensionTestsPath: path.resolve(__dirname, "suite"),
-    launchArgs: [app, "--disable-extensions", "--skip-welcome", "--skip-release-notes"],
-    extensionTestsEnv: env,
+    launchArgs: [app, "--disable-extensions", "--skip-welcome", "--skip-release-notes", `--user-data-dir=${userData}`],
+    extensionTestsEnv: { ...env, PUNK_IT_HOSTILE_MARKER: path.join(tmp, "hostile-ran"), PUNK_IT_USER_EXECUTABLE: bin },
   });
 }
 
