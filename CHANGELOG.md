@@ -9,3 +9,4 @@ First version. Needs punk-records 0.4.0 or newer.
 - Conflicts and edits open in VS Code's side-by-side diff (store copy vs local file)
 - "Punk Records" view in the Explorer: satellites, memory files, read-only team subscriptions
 - Optional: run `punk save` when you save a memory file (`punkRecords.saveOnFileSave`)
+- `punkRecords.executable` and `punkRecords.home` are user settings only; a workspace cannot set them. Off in untrusted workspaces

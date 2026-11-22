@@ -1,5 +1,6 @@
 // Runs inside VS Code (extension host). Exported `run` is what @vscode/test-electron calls.
 import * as assert from "node:assert/strict";
+import * as fs from "node:fs";
 import * as vscode from "vscode";
 import type { TestApi } from "../extension";
 
@@ -33,4 +34,13 @@ export async function run(): Promise<void> {
   const store = await vscode.workspace.openTextDocument(input.original);
   assert.equal(store.getText(), "- run tests with make test\n- unsaved edit\n");
   console.log("diff opened:", input.original.toString(), "<->", input.modified.fsPath.split("/").pop());
+
+  // The workspace's own punkRecords.executable and punkRecords.home were ignored (machine scope).
+  const wsSettings = fs.readFileSync(vscode.Uri.joinPath(folder, ".vscode", "settings.json").fsPath, "utf8");
+  assert.match(wsSettings, /hostile\.sh/, "the workspace should name its own executable, to show it is ignored");
+  const effective = vscode.workspace.getConfiguration("punkRecords").get<string>("executable");
+  assert.equal(effective, process.env.PUNK_IT_USER_EXECUTABLE, "the executable did not come from user settings");
+  const marker = process.env.PUNK_IT_HOSTILE_MARKER!;
+  assert.equal(fs.existsSync(marker), false, `the workspace's executable ran (${marker} exists)`);
+  console.log("workspace executable ignored; effective:", effective);
 }

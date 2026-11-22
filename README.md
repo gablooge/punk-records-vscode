@@ -26,13 +26,18 @@ punk-records`), then `punk init` and `punk track <project>`. If VS Code cannot f
 
 | Setting | Default | |
 |---|---|---|
-| `punkRecords.executable` | `punk` | the punk command or its full path |
-| `punkRecords.home` | (empty) | store location; empty means `~/.punk-records` |
+| `punkRecords.executable` | `punk` | the punk command or its full path (user settings only) |
+| `punkRecords.home` | (empty) | store location; empty means `~/.punk-records` (user settings only) |
 | `punkRecords.saveOnFileSave` | `false` | run `punk save` when a memory file is saved |
 | `punkRecords.refreshSeconds` | `60` | how often the status bar checks; 0 for only after commands |
 
 The extension only runs the `punk` CLI; it has no other dependencies and does not reach the network
 itself (Sync does, through your git remote).
+
+`punkRecords.executable` and `punkRecords.home` are read from your user settings only; a
+workspace's `.vscode/settings.json` cannot set them, so opening a repository cannot make the
+extension run a program of its choosing. The extension stays off in Restricted Mode (untrusted
+workspaces).
 
 ## License
 
