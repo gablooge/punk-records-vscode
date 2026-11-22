@@ -43,4 +43,26 @@ export async function run(): Promise<void> {
   const marker = process.env.PUNK_IT_HOSTILE_MARKER!;
   assert.equal(fs.existsSync(marker), false, `the workspace's executable ran (${marker} exists)`);
   console.log("workspace executable ignored; effective:", effective);
+
+  // Setup states: no store, then no punk at all; back to normal once the settings are restored.
+  const cfg = vscode.workspace.getConfiguration("punkRecords");
+  const home = cfg.get<string>("home");
+  await cfg.update("home", home + "-missing", vscode.ConfigurationTarget.Global);
+  await api.refresh();
+  snap = api.snapshot();
+  console.log("no store:", snap.text, "| setup:", snap.setup);
+  assert.equal(snap.setup, "init");
+  assert.equal(snap.text, "$(tools) punk: set up");
+  await cfg.update("executable", effective + "-missing", vscode.ConfigurationTarget.Global);
+  await api.refresh();
+  snap = api.snapshot();
+  console.log("no punk:", snap.text, "| setup:", snap.setup);
+  assert.equal(snap.setup, "install");
+  await cfg.update("executable", effective, vscode.ConfigurationTarget.Global);
+  await cfg.update("home", home, vscode.ConfigurationTarget.Global);
+  await api.refresh();
+  snap = api.snapshot();
+  console.log("restored:", snap.text, "| setup:", snap.setup);
+  assert.equal(snap.setup, null);
+  assert.equal(snap.text, "$(check) punk");
 }

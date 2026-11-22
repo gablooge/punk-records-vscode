@@ -43,7 +43,16 @@ export interface RunResult {
   stderr: string;
 }
 
-export class PunkError extends Error {}
+/** What a setup problem needs: install punk, upgrade it, or create a store. "other" is any other failure. */
+export type Problem = "missing" | "old" | "nostore" | "other";
+
+export class PunkError extends Error {
+  constructor(message: string, readonly problem: Problem = "other") {
+    super(message);
+  }
+}
+
+const NO_STORE = /no store at .* run `punk init` first/;
 
 export class Punk {
   constructor(
@@ -73,6 +82,7 @@ export class Punk {
               new PunkError(
                 `'${this.executable}' was not found. Install it with \`pipx install punk-records\`, ` +
                   "or set punkRecords.executable to its full path (`which punk`).",
+                "missing",
               ),
             );
             return;
@@ -88,15 +98,16 @@ export class Punk {
     const r = await this.run([...args, "--json"]);
     if (r.code !== 0) {
       if (/unrecognized arguments: --json/.test(r.stderr)) {
-        throw new PunkError(`punk ${args[0]} has no --json; punk 0.4.0 or newer is needed (pipx upgrade punk-records)`);
+        throw new PunkError(`punk ${args[0]} has no --json; punk 0.4.0 or newer is needed (pipx upgrade punk-records)`, "old");
       }
-      throw new PunkError((r.stderr || r.stdout).trim().replace(/^punk: /, "") || `punk ${args[0]} failed`);
+      const msg = (r.stderr || r.stdout).trim().replace(/^punk: /, "") || `punk ${args[0]} failed`;
+      throw new PunkError(msg, NO_STORE.test(msg) ? "nostore" : "other");
     }
     let data: T;
     try {
       data = JSON.parse(r.stdout) as T;
     } catch {
-      throw new PunkError(`punk ${args[0]} --json did not return JSON; punk 0.4.0 or newer is needed`);
+      throw new PunkError(`punk ${args[0]} --json did not return JSON; punk 0.4.0 or newer is needed`, "old");
     }
     if (data.version !== SUPPORTED_JSON_VERSION) {
       throw new PunkError(
