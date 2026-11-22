@@ -22,6 +22,17 @@ syncs your AI agent memories (`CLAUDE.md`, `AGENTS.md`, napkins, rules) across p
 
 ![Compare with store: the store copy next to the local CLAUDE.md, with the new line highlighted](https://raw.githubusercontent.com/gablooge/punk-records-vscode/main/docs/diff.png)
 
+## Install
+
+- **VS Code:** search "Punk Records" in the Extensions view, or
+  `code --install-extension gablooge.punk-records`
+  ([Marketplace](https://marketplace.visualstudio.com/items?itemName=gablooge.punk-records)).
+- **VSCodium, Cursor and other editors using Open VSX:**
+  [open-vsx.org/extension/gablooge/punk-records](https://open-vsx.org/extension/gablooge/punk-records).
+- **Offline:** download the `.vsix` from
+  [Releases](https://github.com/gablooge/punk-records-vscode/releases), then
+  `code --install-extension punk-records-<version>.vsix`.
+
 ## Requirements
 
 The `punk` command, version 0.4.0 or newer: `pipx install punk-records` (or `pipx upgrade
