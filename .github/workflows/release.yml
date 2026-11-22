@@ -1,0 +1,89 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+# Each publish job waits for a maintainer to approve its environment. Both environments must exist
+# with a required reviewer before the first tag; otherwise GitHub creates them unprotected.
+# The jobs are separate so a failed one can be rerun alone: a registry refuses a version that is
+# already published, so rerunning both after one succeeded would fail.
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Tag must match package version
+        run: |
+          v=$(node -p "require('./package.json').version")
+          [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME does not match version $v"; exit 1; }
+      - run: pip install "punk-records>=0.4.0"
+      - run: npm ci
+      - run: npm test
+      - run: xvfb-run -a npm run test:vscode
+      - run: npm run package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: "*.vsix"
+          if-no-files-found: error
+
+  marketplace:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: marketplace
+      url: https://marketplace.visualstudio.com/items?itemName=gablooge.punk-records
+    permissions:
+      contents: read
+      id-token: write   # Marketplace trusted publishing, no token stored
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: vsix
+      - run: npx vsce publish --oidc --packagePath ./*.vsix
+
+  openvsx:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: openvsx
+      url: https://open-vsx.org/extension/gablooge/punk-records
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: vsix
+      - run: npx ovsx publish --packagePath ./*.vsix
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}   # an environment secret of `openvsx`
+
+  github-release:
+    needs: [marketplace, openvsx]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: vsix
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" ./*.vsix --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
