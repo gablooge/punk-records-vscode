@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: "3.13"
       # the punk CLI the extension drives (needs `--json`, punk-records 0.4.0+)
-      - run: pip install "punk-records @ git+https://github.com/gablooge/punk-records@main"
+      - run: pip install "punk-records>=0.4.0"
       - run: npm ci
       - run: npm test
       - if: runner.os == 'Linux'
