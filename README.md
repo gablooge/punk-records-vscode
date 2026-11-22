@@ -33,6 +33,15 @@ syncs your AI agent memories (`CLAUDE.md`, `AGENTS.md`, napkins, rules) across p
   [Releases](https://github.com/gablooge/punk-records-vscode/releases), then
   `code --install-extension punk-records-<version>.vsix`.
 
+## Getting started
+
+On first use the extension finds what is missing and offers the next step in the Punk Records view
+and the status bar (`punk: set up`): install or upgrade punk (runs `pipx` in a terminal you can
+see), create a store or clone your existing one from its git URL, and track the open folder. The
+walkthrough **Get started with Punk Records** (Help, Welcome) shows the same steps.
+
+![The Punk Records view on a machine without a store: a button to create or clone one](https://raw.githubusercontent.com/gablooge/punk-records-vscode/main/docs/setup.png)
+
 ## Requirements
 
 The `punk` command, version 0.4.0 or newer: `pipx install punk-records` (or `pipx upgrade

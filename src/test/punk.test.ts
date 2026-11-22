@@ -70,19 +70,21 @@ test("show reads store copies, also from a team subscription", { skip }, async (
 });
 
 test("a store that does not exist is a readable error", { skip }, async () => {
-  await assert.rejects(new Punk(bin, path.join(tmp, "missing")).status(), /run `punk init` first/);
+  await assert.rejects(new Punk(bin, path.join(tmp, "missing")).status(),
+    (e: PunkError) => /run `punk init` first/.test(e.message) && e.problem === "nostore");
 });
 
 test("a missing punk executable is a readable error", async () => {
-  await assert.rejects(new Punk(path.join(tmp, "no-such-punk")).status(), /pipx install punk-records/);
+  await assert.rejects(new Punk(path.join(tmp, "no-such-punk")).status(),
+    (e: PunkError) => /pipx install punk-records/.test(e.message) && e.problem === "missing");
 });
 
 test("an unknown JSON version is refused, not misread", { skip: process.platform === "win32" ? "uses a POSIX shell script" : false }, async () => {
   const fake = path.join(tmp, "fake-punk");
   fs.writeFileSync(fake, '#!/bin/sh\necho \'{"version": 2, "save": [], "restore": [], "remote": null}\'\n', { mode: 0o755 });
-  await assert.rejects(new Punk(fake).status(), /version 2 is not supported/);
+  await assert.rejects(new Punk(fake).status(), (e: PunkError) => /version 2 is not supported/.test(e.message) && e.problem === "other");
   fs.writeFileSync(fake, "#!/bin/sh\necho 'local changes: none'\n", { mode: 0o755 });
-  await assert.rejects(new Punk(fake).status(), /did not return JSON; punk 0.4.0 or newer/);
+  await assert.rejects(new Punk(fake).status(), (e: PunkError) => /did not return JSON; punk 0.4.0 or newer/.test(e.message) && e.problem === "old");
 });
 
 test("a punk without --json says to upgrade", { skip: process.platform === "win32" ? "uses a POSIX shell script" : false }, async () => {
@@ -90,6 +92,7 @@ test("a punk without --json says to upgrade", { skip: process.platform === "win3
   const fake = path.join(tmp, "old-punk");
   fs.writeFileSync(fake, "#!/bin/sh\necho 'usage: punk [-h] [--home HOME] [--version] command ...' >&2\n" +
     "echo 'punk: error: unrecognized arguments: --json' >&2\nexit 2\n", { mode: 0o755 });
-  await assert.rejects(new Punk(fake).status(), (e: Error) =>
-    /punk 0\.4\.0 or newer is needed/.test(e.message) && /pipx upgrade punk-records/.test(e.message) && !/usage:/.test(e.message));
+  await assert.rejects(new Punk(fake).status(), (e: PunkError) =>
+    /punk 0\.4\.0 or newer is needed/.test(e.message) && /pipx upgrade punk-records/.test(e.message) && !/usage:/.test(e.message) &&
+    e.problem === "old");
 });

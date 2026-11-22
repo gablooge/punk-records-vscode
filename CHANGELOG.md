@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Getting started: when punk is missing, too old or has no store, the Punk Records view and the status
+  bar (`punk: set up`) offer the next step (install or upgrade with pipx in a terminal, create or clone
+  a store, track the open folder), plus a walkthrough with the same steps
+- Untracked workspace folders appear as "Track <folder>" at the top of the view
+- A refresh asked for while another runs now runs again afterwards, so it reflects settings changed
+  in between
+
 ## 0.1.0 - 2026-11-22
 
 First version. Needs punk-records 0.4.0 or newer.

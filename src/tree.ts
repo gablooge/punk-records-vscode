@@ -9,22 +9,38 @@ export type Node =
   | { type: "subscription"; name: string; url: string; satellites: { id: string; memories: string[] }[] }
   | { type: "teamSatellite"; team: string; id: string; memories: string[] }
   | { type: "memory"; satellite: string; rel: string; localFile: string | null; team: boolean }
-  | { type: "message"; text: string };
+  | { type: "message"; text: string }
+  | { type: "track"; folder: string; name: string };
 
 export class MemoriesTree implements vscode.TreeDataProvider<Node> {
   private readonly changed = new vscode.EventEmitter<Node | undefined>();
   readonly onDidChangeTreeData = this.changed.event;
   private listing: Listing | null = null;
   private error: string | null = null;
+  private untracked: { folder: string; name: string }[] = [];
+  private setupMode = false;
 
-  update(listing: Listing | null, error: string | null = null): void {
+  /** `untracked`: workspace folders that are not tracked yet, offered as "Track <name>" rows. */
+  update(listing: Listing | null, error: string | null = null, untracked: { folder: string; name: string }[] = []): void {
     this.listing = listing;
     this.error = error;
+    this.untracked = untracked;
+    this.setupMode = false;
+    this.changed.fire(undefined);
+  }
+
+  /** punk is missing, too old, or has no store: show nothing, so the view's welcome content appears. */
+  setup(): void {
+    this.listing = null;
+    this.error = null;
+    this.untracked = [];
+    this.setupMode = true;
     this.changed.fire(undefined);
   }
 
   getChildren(node?: Node): Node[] {
     if (!node) {
+      if (this.setupMode) return [];
       if (this.error) return [{ type: "message", text: this.error }];
       if (!this.listing) return [{ type: "message", text: "Loading..." }];
       const sats: Node[] = this.listing.satellites.map((s) => ({
@@ -33,8 +49,8 @@ export class MemoriesTree implements vscode.TreeDataProvider<Node> {
       const subs: Node[] = this.listing.subscriptions.map((s) => ({
         type: "subscription", name: s.name, url: s.url, satellites: s.satellites,
       }));
-      const all = [...sats, ...subs];
-      return all.length ? all : [{ type: "message", text: "Nothing tracked yet: run `punk track <folder>`" }];
+      const track: Node[] = this.untracked.map((u) => ({ type: "track", folder: u.folder, name: u.name }));
+      return [...track, ...sats, ...subs];
     }
     if (node.type === "satellite") {
       return node.memories.map((rel) => {
@@ -58,6 +74,14 @@ export class MemoriesTree implements vscode.TreeDataProvider<Node> {
     switch (node.type) {
       case "message":
         return new vscode.TreeItem(node.text, C.None);
+      case "track": {
+        const item = new vscode.TreeItem(`Track ${node.name}`, C.None);
+        item.description = "not tracked yet";
+        item.tooltip = `Run punk track for ${node.folder}, then save its memory files`;
+        item.iconPath = new vscode.ThemeIcon("add");
+        item.command = { command: "punkRecords.track", title: "Track", arguments: [node.folder] };
+        return item;
+      }
       case "satellite": {
         const item = new vscode.TreeItem(node.id, C.Collapsed);
         item.description = node.localPath ?? "not on this machine";

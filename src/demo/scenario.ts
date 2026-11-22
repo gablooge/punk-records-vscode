@@ -144,4 +144,16 @@ export async function run(): Promise<void> {
   await sleep(2500);
   await rec.stop();
   console.log("final status:", api.snapshot().text);
+
+  // A machine with punk but no store yet: the view's welcome content offers to create or clone one.
+  const cfg = vscode.workspace.getConfiguration("punkRecords");
+  const home = cfg.get<string>("home");
+  await cfg.update("home", `${home}-new-machine`, vscode.ConfigurationTarget.Global);
+  await api.refresh();
+  await cmd("workbench.action.closeAllEditors");
+  await cmd("punkRecords.memories.focus");
+  await sleep(800);
+  await still("setup.png");
+  console.log("setup status:", api.snapshot().text, api.snapshot().setup);
+  await cfg.update("home", home, vscode.ConfigurationTarget.Global);
 }

@@ -1,6 +1,8 @@
+import * as fs from "node:fs";
 import * as vscode from "vscode";
 import { memoryFile } from "./memories";
 import { Punk, PunkError, type Listing } from "./punk";
+import { installCommand, nextStep, setupStatus, type Step } from "./setup";
 import { StoreDocuments, SCHEME, storeUri } from "./storeDocs";
 import { summarize } from "./summary";
 import { MemoriesTree, type Node } from "./tree";
@@ -12,6 +14,9 @@ let statusItem: vscode.StatusBarItem;
 let timer: NodeJS.Timeout | undefined;
 let tree: MemoriesTree;
 let refreshing: Promise<void> | null = null;
+let queued: Promise<void> | null = null;
+let step: Step | null = null;
+let terminal: vscode.Terminal | undefined;
 const pendingSaves = new Map<string, NodeJS.Timeout>();
 
 function config() {
@@ -31,30 +36,122 @@ function configure(): void {
   timer = c.refreshSeconds > 0 ? setInterval(() => void refresh(), c.refreshSeconds * 1000) : undefined;
 }
 
-async function refresh(): Promise<void> {
-  if (refreshing) return refreshing; // one refresh at a time
+/**
+ * One refresh at a time. A call during a running refresh queues one more run after it (shared by
+ * every call in the meantime), so the result always reflects settings changed since that run began.
+ */
+function refresh(): Promise<void> {
+  if (refreshing) {
+    queued ??= refreshing.then(() => {
+      queued = null;
+      return refresh();
+    });
+    return queued;
+  }
   refreshing = (async () => {
     try {
       const [status, list] = await Promise.all([punk.status(), punk.list()]);
       listing = list;
-      tree.update(list);
-      const s = summarize(status);
+      tree.update(list, null, untrackedFolders(list));
+      setStep(nextStep(null, list.satellites.filter((s) => s.kind !== "global").length));
+      const s = step ? setupStatus(step, "") : summarize(status);
       statusItem.text = s.text;
       statusItem.tooltip = s.tooltip;
       statusItem.backgroundColor =
-        s.state === "conflict" ? new vscode.ThemeColor("statusBarItem.warningBackground") : undefined;
+        !step && summarize(status).state === "conflict" ? new vscode.ThemeColor("statusBarItem.warningBackground") : undefined;
     } catch (e) {
       const msg = (e as Error).message;
       listing = null;
-      tree.update(null, msg);
-      statusItem.text = "$(circle-slash) punk";
-      statusItem.tooltip = msg;
+      const problem = e instanceof PunkError ? e.problem : "other";
+      setStep(nextStep(problem, 0));
+      if (step) {
+        tree.setup();
+        const s = setupStatus(step, msg);
+        statusItem.text = s.text;
+        statusItem.tooltip = s.tooltip;
+      } else {
+        tree.update(null, msg);
+        statusItem.text = "$(circle-slash) punk";
+        statusItem.tooltip = msg;
+      }
       statusItem.backgroundColor = undefined;
     } finally {
       refreshing = null;
     }
   })();
   return refreshing;
+}
+
+function setStep(next: Step | null): void {
+  step = next;
+  statusItem.command = step ? "punkRecords.setup" : "punkRecords.menu";
+  void vscode.commands.executeCommand("setContext", "punkRecords.setup", step ?? "");
+}
+
+function real(p: string): string {
+  try {
+    return fs.realpathSync.native(p);
+  } catch {
+    return p;
+  }
+}
+
+/** Workspace folders punk does not track yet. */
+function untrackedFolders(list: Listing): { folder: string; name: string }[] {
+  const tracked = new Set(list.satellites.map((s) => s.local_path).filter((p): p is string => !!p).map(real));
+  return (vscode.workspace.workspaceFolders ?? [])
+    .filter((f) => f.uri.scheme === "file" && !tracked.has(real(f.uri.fsPath)))
+    .map((f) => ({ folder: f.uri.fsPath, name: f.name }));
+}
+
+/** Install or upgrade punk in a terminal the user can see; the command text is fixed. */
+async function installPunk(kind: "install" | "upgrade"): Promise<void> {
+  if (!terminal || terminal.exitStatus !== undefined) terminal = vscode.window.createTerminal({ name: "Punk Records" });
+  terminal.show();
+  terminal.sendText(installCommand(kind));
+  const pick = await vscode.window.showInformationMessage(
+    `Punk Records: running \`${installCommand(kind)}\` in the terminal. Needs pipx (https://pipx.pypa.io). Refresh when it has finished.`,
+    "Refresh",
+  );
+  if (pick) await refresh();
+}
+
+async function initStore(): Promise<void> {
+  const choice = await vscode.window.showQuickPick(
+    [
+      { label: "$(add) Create a new store", description: "on this machine; add a git remote later to sync", url: false },
+      { label: "$(repo-clone) Use my existing store", description: "clone it from its git URL (another machine)", url: true },
+    ],
+    { placeHolder: "Punk Records needs a store for your memories" },
+  );
+  if (!choice) return;
+  if (!choice.url) {
+    await runPunk("creating the store", ["init"]);
+    return;
+  }
+  const url = await vscode.window.showInputBox({
+    prompt: "Git URL of your Punk Records store",
+    placeHolder: "git@github.com:you/my-punk-records.git",
+    ignoreFocusOut: true,
+    validateInput: (v) => (!v.trim() ? "Enter a git URL" : /\s/.test(v.trim()) ? "A git URL has no spaces" : undefined),
+  });
+  if (url) await runPunk("cloning the store", ["init", url.trim()]);
+}
+
+async function track(folder?: string): Promise<void> {
+  const folders = folder ? [folder] : (listing ? untrackedFolders(listing) : []).map((u) => u.folder);
+  if (!folders.length) {
+    vscode.window.showInformationMessage("Punk Records: every open folder is tracked already.");
+    return;
+  }
+  if ((await runPunk("tracking", ["track", ...folders])) === 0) await runPunk("saving", ["save"]);
+}
+
+async function setup(): Promise<void> {
+  if (step === "install" || step === "upgrade") await installPunk(step);
+  else if (step === "init") await initStore();
+  else if (step === "track") await track();
+  else await menu();
 }
 
 /** Run a punk command with a progress notification; show output and problems. */
@@ -180,7 +277,7 @@ function onSave(doc: vscode.TextDocument): void {
 /** Returned from activate() so the integration test can see what the user would see. */
 export interface TestApi {
   refresh(): Promise<void>;
-  snapshot(): { text: string; tooltip: string; satellites: string[]; subscriptions: string[] };
+  snapshot(): { text: string; tooltip: string; satellites: string[]; subscriptions: string[]; setup: string | null };
 }
 
 export function activate(context: vscode.ExtensionContext): TestApi {
@@ -208,6 +305,12 @@ export function activate(context: vscode.ExtensionContext): TestApi {
     reg("punkRecords.menu", () => menu()),
     reg("punkRecords.open", (node: Node) => open(node)),
     reg("punkRecords.showOutput", () => output.show(true)),
+    reg("punkRecords.setup", () => setup()),
+    reg("punkRecords.install", () => installPunk("install")),
+    reg("punkRecords.upgrade", () => installPunk("upgrade")),
+    reg("punkRecords.init", () => initStore()),
+    reg("punkRecords.track", (folder?: string) => track(typeof folder === "string" ? folder : undefined)),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => void refresh()),
     vscode.workspace.onDidSaveTextDocument(onSave),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("punkRecords")) {
@@ -225,6 +328,7 @@ export function activate(context: vscode.ExtensionContext): TestApi {
       tooltip: String(statusItem.tooltip ?? ""),
       satellites: (listing?.satellites ?? []).map((s) => s.id),
       subscriptions: (listing?.subscriptions ?? []).map((s) => s.name),
+      setup: step,
     }),
   };
 }

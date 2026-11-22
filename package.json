@@ -85,6 +85,31 @@
         "command": "punkRecords.showOutput",
         "title": "Show output",
         "category": "Punk Records"
+      },
+      {
+        "command": "punkRecords.setup",
+        "title": "Set up",
+        "category": "Punk Records"
+      },
+      {
+        "command": "punkRecords.install",
+        "title": "Install punk (pipx)",
+        "category": "Punk Records"
+      },
+      {
+        "command": "punkRecords.upgrade",
+        "title": "Upgrade punk (pipx)",
+        "category": "Punk Records"
+      },
+      {
+        "command": "punkRecords.init",
+        "title": "Create or clone a store",
+        "category": "Punk Records"
+      },
+      {
+        "command": "punkRecords.track",
+        "title": "Track open folders",
+        "category": "Punk Records"
       }
     ],
     "views": {
@@ -144,7 +169,82 @@
           "markdownDescription": "How often the status bar checks for changes (0: only after commands and saves)."
         }
       }
-    }
+    },
+    "viewsWelcome": [
+      {
+        "view": "punkRecords.memories",
+        "when": "punkRecords.setup == install",
+        "contents": "The `punk` command was not found. This extension shows and runs what punk does, so it needs punk 0.4.0 or newer.\n[Install punk](command:punkRecords.install)\nRuns `pipx install punk-records` in a terminal. Installed somewhere else? [Set its path](command:workbench.action.openSettings?%5B%22punkRecords.executable%22%5D)."
+      },
+      {
+        "view": "punkRecords.memories",
+        "when": "punkRecords.setup == upgrade",
+        "contents": "Your `punk` is older than 0.4.0, the first version this extension can read.\n[Upgrade punk](command:punkRecords.upgrade)\nRuns `pipx upgrade punk-records` in a terminal."
+      },
+      {
+        "view": "punkRecords.memories",
+        "when": "punkRecords.setup == init",
+        "contents": "punk is installed, but there is no store for your memories yet.\n[Create or clone a store](command:punkRecords.init)\nOn a second machine, choose your existing store's git URL to bring your memories back."
+      },
+      {
+        "view": "punkRecords.memories",
+        "when": "punkRecords.setup == track",
+        "contents": "Nothing is tracked yet.\n[Track open folders](command:punkRecords.track)\npunk picks up CLAUDE.md, AGENTS.md, napkins and rules in each tracked folder."
+      }
+    ],
+    "walkthroughs": [
+      {
+        "id": "start",
+        "title": "Get started with Punk Records",
+        "description": "Keep CLAUDE.md, AGENTS.md, napkins and rules in one store, synced across projects and machines.",
+        "steps": [
+          {
+            "id": "install",
+            "title": "Install punk",
+            "description": "The extension runs the `punk` command (0.4.0 or newer).\n[Install punk](command:punkRecords.install)",
+            "media": {
+              "markdown": "media/walkthrough/install.md"
+            },
+            "completionEvents": [
+              "onContext:punkRecords.setup != install && punkRecords.setup != upgrade"
+            ]
+          },
+          {
+            "id": "init",
+            "title": "Create or clone your store",
+            "description": "A store is a git repository of your memories. Create one, or clone the one you already have on another machine.\n[Create or clone a store](command:punkRecords.init)",
+            "media": {
+              "markdown": "media/walkthrough/init.md"
+            },
+            "completionEvents": [
+              "onCommand:punkRecords.init"
+            ]
+          },
+          {
+            "id": "track",
+            "title": "Track this folder",
+            "description": "punk saves this folder's memory files into the store.\n[Track open folders](command:punkRecords.track)",
+            "media": {
+              "markdown": "media/walkthrough/track.md"
+            },
+            "completionEvents": [
+              "onCommand:punkRecords.track"
+            ]
+          },
+          {
+            "id": "sync",
+            "title": "Sync across machines",
+            "description": "Add a private git repo as the store's remote, then sync from the status bar.\n[Sync now](command:punkRecords.sync)",
+            "media": {
+              "markdown": "media/walkthrough/sync.md"
+            },
+            "completionEvents": [
+              "onCommand:punkRecords.sync"
+            ]
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "compile": "tsc -p .",
