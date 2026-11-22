@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/gablooge/punk-records-vscode/security/advisories/new
+    about: Please report security problems privately, not as a public issue.
+  - name: Problem with the punk command itself
+    url: https://github.com/gablooge/punk-records/issues/new/choose
+    about: Sync, scanning, restore or MCP problems that also happen in a terminal belong to punk-records.

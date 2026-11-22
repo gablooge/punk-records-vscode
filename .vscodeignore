@@ -8,3 +8,5 @@ node_modules/**
 .gitignore
 out/integration/**
 scripts/**
+CONTRIBUTING.md
+SECURITY.md

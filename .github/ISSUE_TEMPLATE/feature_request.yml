@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest a command, view or setting for the extension.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe what you are trying to do in VS Code and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Project constraints
+      description: The extension drives the punk command and has no runtime dependencies.
+      options:
+        - label: This can be done with what `punk` already offers, or I will also suggest the punk change in punk-records.
+        - label: This needs no runtime npm dependency.

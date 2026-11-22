@@ -1,0 +1,78 @@
+name: Bug report
+description: Something in the extension does not work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please remove private paths, project names and memory text from anything you paste.
+        If the same problem happens with `punk` in a terminal, report it at [punk-records](https://github.com/gablooge/punk-records/issues/new/choose) instead.
+        Security problems go to [Report a vulnerability](https://github.com/gablooge/punk-records-vscode/security/advisories/new), not here.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a tracked project
+        2. Run "Punk Records: Sync"
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output channel
+      description: "From \"Punk Records: Show output\", plus `punk status` in a terminal if it is a sync problem."
+      render: text
+  - type: input
+    id: extension-version
+    attributes:
+      label: Extension version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: punk-version
+    attributes:
+      label: punk version
+      description: Output of `punk --version`.
+      placeholder: punk 0.4.0
+    validations:
+      required: true
+  - type: input
+    id: vscode-version
+    attributes:
+      label: VS Code version
+      description: Help, About (or `code --version`). Mention it if you use Cursor, VSCodium or another editor.
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it happen?
+      multiple: true
+      options:
+        - status bar
+        - commands (save / sync / restore / dedupe)
+        - compare with store (diff)
+        - Punk Records view in the Explorer
+        - settings
+        - other
