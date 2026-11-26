@@ -29,6 +29,16 @@ async function main(): Promise<void> {
   run(bin, ["--home", store, "track", app]);
   run(bin, ["--home", store, "save"]);
   fs.writeFileSync(path.join(app, "CLAUDE.md"), "- run tests with make test\n- unsaved edit\n");
+  // A git repo that is not a punk store: the suite points the store at it to see a sync that is blocked.
+  const foreign = path.join(tmp, "foreign.git");
+  const foreignWork = path.join(tmp, "foreign-work");
+  run("git", ["init", "-q", "--bare", foreign]);
+  fs.mkdirSync(foreignWork);
+  run("git", ["init", "-q"], foreignWork);
+  fs.writeFileSync(path.join(foreignWork, "README.md"), "not a punk store\n");
+  run("git", ["add", "-A"], foreignWork);
+  run("git", ["commit", "-qm", "x"], foreignWork);
+  run("git", ["push", "-q", foreign, "HEAD:main"], foreignWork);
   // The real executable and store come from user settings. The workspace names a program of its own,
   // which must never run (both settings are machine-scoped); the suite checks its marker file is absent.
   const userData = path.join(tmp, "user-data");
@@ -43,7 +53,10 @@ async function main(): Promise<void> {
     extensionDevelopmentPath: path.resolve(__dirname, "..", ".."),
     extensionTestsPath: path.resolve(__dirname, "suite"),
     launchArgs: [app, "--disable-extensions", "--skip-welcome", "--skip-release-notes", `--user-data-dir=${userData}`],
-    extensionTestsEnv: { ...env, PUNK_IT_HOSTILE_MARKER: path.join(tmp, "hostile-ran"), PUNK_IT_USER_EXECUTABLE: bin },
+    extensionTestsEnv: {
+      ...env, PUNK_IT_HOSTILE_MARKER: path.join(tmp, "hostile-ran"), PUNK_IT_USER_EXECUTABLE: bin,
+      PUNK_IT_STORE: store, PUNK_IT_FOREIGN_REMOTE: foreign,
+    },
   });
 }
 

@@ -8,7 +8,10 @@ syncs your AI agent memories (`CLAUDE.md`, `AGENTS.md`, napkins, rules) across p
 ## Features
 
 - **Status bar.** `✓ punk` when everything is saved and restored; otherwise how many memories wait to
-  be saved or restored, or how many conflicts need you. Click it for the actions.
+  be saved or restored, or how many conflicts need you. Click it for the actions. When a sync is
+  blocked until you act, it says so and stays until a sync succeeds: `punk: sync blocked` (the store
+  and its remote both changed the same files), `punk: wrong remote` (the remote is not a Punk Records
+  store) or `punk: needs age` (an encrypted store without `age` installed). The tooltip says what to do.
 - **Commands** (Command Palette, "Punk Records: ..."): Save memories, Sync, Restore memories,
   Compare with store, Remove duplicate lines, Refresh.
 - **Conflicts in the diff view.** "Compare with store" opens the store copy next to your local file in
@@ -46,7 +49,8 @@ walkthrough **Get started with Punk Records** (Help, Welcome) shows the same ste
 
 The `punk` command, version 0.4.0 or newer: `pipx install punk-records` (or `pipx upgrade
 punk-records`), then `punk init` and `punk track <project>`. If VS Code cannot find `punk`, set
-`punkRecords.executable` to the output of `which punk`.
+`punkRecords.executable` to the output of `which punk`. A blocked sync is shown with punk 0.6.1 or
+newer (0.6.2 for `wrong remote`); with older punk it is a one-off warning.
 
 ## Settings
 

@@ -1,5 +1,6 @@
 // Runs inside VS Code (extension host). Exported `run` is what @vscode/test-electron calls.
 import * as assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as vscode from "vscode";
 import type { TestApi } from "../extension";
@@ -65,4 +66,31 @@ export async function run(): Promise<void> {
   console.log("restored:", snap.text, "| setup:", snap.setup);
   assert.equal(snap.setup, null);
   assert.equal(snap.text, "$(check) punk");
+
+  // A sync that cannot merge the remote stays in the status bar until a sync succeeds (punk 0.6.2+
+  // refuses a remote that is not a punk store; older punk mixed it in, so there is nothing to show).
+  const version = execFileSync(effective!, ["--version"], { encoding: "utf8" });
+  const [maj, min, pat] = (/(\d+)\.(\d+)\.(\d+)/.exec(version) ?? []).slice(1).map(Number);
+  if ((maj - 0 || min - 6 || pat - 2) < 0) {
+    console.log(`sync problem: skipped, needs punk 0.6.2 or newer (${version.trim()})`);
+    return;
+  }
+  const storeDir = process.env.PUNK_IT_STORE!;
+  execFileSync("git", ["remote", "add", "origin", process.env.PUNK_IT_FOREIGN_REMOTE!], { cwd: storeDir });
+  await vscode.commands.executeCommand("punkRecords.sync");
+  snap = api.snapshot();
+  console.log("wrong remote:", snap.text, "| problem:", snap.syncProblem);
+  assert.equal(snap.syncProblem, "notstore");
+  assert.equal(snap.text, "$(warning) punk: wrong remote");
+  assert.ok(snap.warning, "no warning background");
+  assert.match(snap.tooltip, /^Sync is blocked: the store's remote is not a Punk Records store/);
+  await api.refresh(); // a refresh alone does not clear it: only a sync can tell
+  assert.equal(api.snapshot().text, "$(warning) punk: wrong remote");
+  execFileSync("git", ["remote", "remove", "origin"], { cwd: storeDir });
+  await vscode.commands.executeCommand("punkRecords.sync");
+  snap = api.snapshot();
+  console.log("remote removed:", snap.text, "| problem:", snap.syncProblem);
+  assert.equal(snap.syncProblem, null);
+  assert.equal(snap.text, "$(check) punk");
+  assert.ok(!snap.warning);
 }

@@ -5,6 +5,7 @@ import { Punk, PunkError, type Listing } from "./punk";
 import { installCommand, nextStep, setupStatus, type Step } from "./setup";
 import { StoreDocuments, SCHEME, storeUri } from "./storeDocs";
 import { summarize } from "./summary";
+import { afterSync, syncProblem, type SyncProblem } from "./syncProblem";
 import { MemoriesTree, type Node } from "./tree";
 
 let punk: Punk;
@@ -17,6 +18,8 @@ let refreshing: Promise<void> | null = null;
 let queued: Promise<void> | null = null;
 let step: Step | null = null;
 let terminal: vscode.Terminal | undefined;
+/** A lasting problem from the last `punk sync` (cannot merge the remote, age missing); null after one succeeds. */
+let syncBlock: SyncProblem | null = null;
 const pendingSaves = new Map<string, NodeJS.Timeout>();
 
 function config() {
@@ -31,6 +34,7 @@ function config() {
 
 function configure(): void {
   const c = config();
+  if (punk && (punk.executable !== c.executable || punk.home !== c.home)) syncBlock = null; // about another store
   punk = new Punk(c.executable, c.home);
   if (timer) clearInterval(timer);
   timer = c.refreshSeconds > 0 ? setInterval(() => void refresh(), c.refreshSeconds * 1000) : undefined;
@@ -55,10 +59,13 @@ function refresh(): Promise<void> {
       tree.update(list, null, untrackedFolders(list));
       setStep(nextStep(null, list.satellites.filter((s) => s.kind !== "global").length));
       const s = step ? setupStatus(step, "") : summarize(status);
-      statusItem.text = s.text;
-      statusItem.tooltip = s.tooltip;
+      const blocked = !step && syncBlock;
+      statusItem.text = blocked ? blocked.text : s.text;
+      statusItem.tooltip = blocked ? `${blocked.tooltip}\n\n${s.tooltip}` : s.tooltip;
       statusItem.backgroundColor =
-        !step && summarize(status).state === "conflict" ? new vscode.ThemeColor("statusBarItem.warningBackground") : undefined;
+        blocked || (!step && summarize(status).state === "conflict")
+          ? new vscode.ThemeColor("statusBarItem.warningBackground")
+          : undefined;
     } catch (e) {
       const msg = (e as Error).message;
       listing = null;
@@ -164,11 +171,15 @@ async function runPunk(title: string, args: string[]): Promise<number> {
   if (r.stdout) output.append(r.stdout);
   if (r.stderr) output.append(r.stderr);
   output.appendLine(`(exit ${r.code})`);
+  if (args[0] === "sync") syncBlock = afterSync(syncBlock, r);
   if (r.code === 0) {
     const first = r.stdout.trim().split("\n")[0];
     vscode.window.setStatusBarMessage(`$(check) punk ${args[0]}: ${first || "done"}`, 4000);
   } else {
-    const msg = (r.stderr || r.stdout).trim().split("\n").slice(-3).join(" ") || `exit ${r.code}`;
+    const problem = args[0] === "sync" ? syncProblem(r) : null; // this run's, not one kept from before
+    const msg = problem
+      ? problem.tooltip.split("\n")[0]
+      : (r.stderr || r.stdout).trim().split("\n").slice(-3).join(" ") || `exit ${r.code}`;
     const pick = await vscode.window.showWarningMessage(`punk ${args[0]}: ${msg}`, "Show output");
     if (pick) output.show(true);
   }
@@ -277,7 +288,15 @@ function onSave(doc: vscode.TextDocument): void {
 /** Returned from activate() so the integration test can see what the user would see. */
 export interface TestApi {
   refresh(): Promise<void>;
-  snapshot(): { text: string; tooltip: string; satellites: string[]; subscriptions: string[]; setup: string | null };
+  snapshot(): {
+    text: string;
+    tooltip: string;
+    satellites: string[];
+    subscriptions: string[];
+    setup: string | null;
+    syncProblem: string | null;
+    warning: boolean;
+  };
 }
 
 export function activate(context: vscode.ExtensionContext): TestApi {
@@ -329,6 +348,8 @@ export function activate(context: vscode.ExtensionContext): TestApi {
       satellites: (listing?.satellites ?? []).map((s) => s.id),
       subscriptions: (listing?.subscriptions ?? []).map((s) => s.name),
       setup: step,
+      syncProblem: syncBlock?.kind ?? null,
+      warning: statusItem.backgroundColor !== undefined,
     }),
   };
 }
