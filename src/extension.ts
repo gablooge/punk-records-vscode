@@ -5,7 +5,7 @@ import { Punk, PunkError, type Listing } from "./punk";
 import { installCommand, nextStep, setupStatus, type Step } from "./setup";
 import { StoreDocuments, SCHEME, storeUri } from "./storeDocs";
 import { summarize } from "./summary";
-import { afterSync, syncProblem, type SyncProblem } from "./syncProblem";
+import { afterSync, showBlock, syncProblem, type SyncProblem } from "./syncProblem";
 import { MemoriesTree, type Node } from "./tree";
 
 let punk: Punk;
@@ -59,7 +59,8 @@ function refresh(): Promise<void> {
       tree.update(list, null, untrackedFolders(list));
       setStep(nextStep(null, list.satellites.filter((s) => s.kind !== "global").length));
       const s = step ? setupStatus(step, "") : summarize(status);
-      const blocked = !step && syncBlock;
+      const blocked = showBlock(step, syncBlock);
+      if (blocked) statusItem.command = "punkRecords.menu"; // to sync again, even while "track" is suggested
       statusItem.text = blocked ? blocked.text : s.text;
       statusItem.tooltip = blocked ? `${blocked.tooltip}\n\n${s.tooltip}` : s.tooltip;
       statusItem.backgroundColor =
@@ -163,15 +164,17 @@ async function setup(): Promise<void> {
 
 /** Run a punk command with a progress notification; show output and problems. */
 async function runPunk(title: string, args: string[]): Promise<number> {
+  const used = punk; // settings may change while it runs
   const r = await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Punk Records: ${title}` },
-    () => punk.run(args),
+    () => used.run(args),
   );
   output.appendLine(`$ punk ${args.join(" ")}`);
   if (r.stdout) output.append(r.stdout);
   if (r.stderr) output.append(r.stderr);
-  output.appendLine(`(exit ${r.code})`);
-  if (args[0] === "sync") syncBlock = afterSync(syncBlock, r);
+  output.appendLine(r.killed ? "(stopped before it finished: timeout or signal)" : `(exit ${r.code})`);
+  const sameStore = used.executable === punk.executable && used.home === punk.home;
+  if (args[0] === "sync" && sameStore) syncBlock = afterSync(syncBlock, r); // not about another store
   if (r.code === 0) {
     const first = r.stdout.trim().split("\n")[0];
     vscode.window.setStatusBarMessage(`$(check) punk ${args[0]}: ${first || "done"}`, 4000);

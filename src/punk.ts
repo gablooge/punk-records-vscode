@@ -41,6 +41,8 @@ export interface RunResult {
   code: number;
   stdout: string;
   stderr: string;
+  /** Killed (timeout or signal) before punk exited: `code` is then 1, not punk's own exit code. */
+  killed?: boolean;
 }
 
 /** What a setup problem needs: install punk, upgrade it, or create a store. "other" is any other failure. */
@@ -87,8 +89,10 @@ export class Punk {
             );
             return;
           }
-          const code = e ? (typeof e.code === "number" ? e.code : 1) : 0;
-          resolve({ code, stdout: String(stdout), stderr: String(stderr) });
+          const exit = e ? (e.code as unknown) : 0;
+          const killed = typeof exit !== "number"; // a timeout or signal: no exit code
+          const code = typeof exit === "number" ? exit : 1;
+          resolve({ code, stdout: String(stdout), stderr: String(stderr), killed });
         },
       );
     });

@@ -2,7 +2,7 @@
 import * as assert from "node:assert/strict";
 import { test } from "node:test";
 import type { RunResult } from "../punk";
-import { afterSync, syncProblem } from "../syncProblem";
+import { afterSync, showBlock, syncProblem } from "../syncProblem";
 
 const res = (code: number, stderr = "", stdout = ""): RunResult => ({ code, stdout, stderr });
 
@@ -55,7 +55,34 @@ test("afterSync: cleared when the exchange worked, kept when a sync could not te
   const blocked = syncProblem(res(2, MERGE));
   assert.equal(afterSync(blocked, res(0, "", "in sync\n")), null);
   assert.equal(afterSync(blocked, res(1, "1 file(s) need attention")), null); // file conflicts: the remote merged
-  assert.equal(afterSync(blocked, res(2, UNREACHABLE)), blocked); // the remote was not reached: still blocked
+  const kept = afterSync(blocked, res(2, UNREACHABLE)); // the remote was not reached: still blocked
+  assert.deepEqual([kept?.kind, kept?.text], [blocked?.kind, blocked?.text]);
   assert.equal(afterSync(blocked, res(2, AGE))?.kind, "age"); // a new lasting problem replaces it
   assert.equal(afterSync(null, res(2, UNREACHABLE)), null);
+});
+
+test("afterSync: a run that was killed or timed out keeps the block (its exit code is not punk's)", () => {
+  const blocked = syncProblem(res(2, MERGE));
+  assert.equal(afterSync(blocked, { ...res(1), killed: true }), blocked);
+  assert.equal(afterSync(null, { ...res(1), killed: true }), null);
+});
+
+test("afterSync: another error after a block keeps the block and shows the newer error too", () => {
+  const blocked = syncProblem(res(2, MERGE))!;
+  const push = "punk: git push -q -u origin main failed:\n! [remote rejected] main -> main (pre-receive hook declined)\n";
+  const kept = afterSync(blocked, res(2, push))!;
+  assert.equal(kept.kind, "merge");
+  assert.equal(kept.text, blocked.text);
+  assert.match(kept.tooltip, /both changed satellites/); // the block's own message
+  assert.match(kept.tooltip, /The last sync failed with another error:\ngit push -q -u origin main failed:/);
+  const again = afterSync(kept, res(2, push))!; // not repeated on every failed sync
+  assert.equal(again.tooltip.split("The last sync failed").length, 2);
+});
+
+test("showBlock: a block wins over the track step, not over install, upgrade or init", () => {
+  const blocked = syncProblem(res(2, AGE))!;
+  assert.equal(showBlock(null, blocked), blocked);
+  assert.equal(showBlock("track", blocked), blocked);
+  for (const step of ["install", "upgrade", "init"] as const) assert.equal(showBlock(step, blocked), null);
+  assert.equal(showBlock(null, null), null);
 });

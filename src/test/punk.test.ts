@@ -98,6 +98,15 @@ test("a punk without --json says to upgrade", { skip: process.platform === "win3
     e.problem === "old");
 });
 
+test("a run that times out is marked killed, not read as punk's exit 1", { skip: process.platform === "win32" && "uses a POSIX shell script" }, async () => {
+  const slow = path.join(tmp, "slow-punk.sh");
+  fs.writeFileSync(slow, "#!/bin/sh\nsleep 5\n", { mode: 0o755 });
+  const r = await new Punk(slow, undefined, 300).run(["sync"]);
+  assert.equal(r.killed, true);
+  const ok = await new Punk(bin, store).run(["status"]);
+  assert.equal(ok.killed, false);
+});
+
 // What `punk sync` prints for a problem that stays until a person acts, read by syncProblem().
 // Each needs the punk that first printed it; older punk skips.
 const punkVersion = (() => {
