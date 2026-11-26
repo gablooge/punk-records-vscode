@@ -180,8 +180,11 @@ async function runPunk(title: string, args: string[]): Promise<number> {
     const msg = problem
       ? problem.tooltip.split("\n")[0]
       : (r.stderr || r.stdout).trim().split("\n").slice(-3).join(" ") || `exit ${r.code}`;
-    const pick = await vscode.window.showWarningMessage(`punk ${args[0]}: ${msg}`, "Show output");
-    if (pick) output.show(true);
+    // Not awaited: the promise settles only when the message is closed, and until then the status
+    // bar would not refresh (and the command would not return: the integration test hung on Linux).
+    void vscode.window.showWarningMessage(`punk ${args[0]}: ${msg}`, "Show output").then((pick) => {
+      if (pick) output.show(true);
+    });
   }
   await refresh();
   return r.code;

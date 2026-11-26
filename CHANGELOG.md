@@ -13,6 +13,7 @@
   and its remote both changed the same files), `punk: wrong remote` (not a Punk Records store,
   punk 0.6.2+) or `punk: needs age` (encrypted store, `age` not installed). The tooltip says what to
   do, then punk's own message. A remote that cannot be reached stays a one-off warning
+- The warning after a failed command no longer holds up the status bar refresh until it is closed
 - `npm run test:vscode` works when started from inside VS Code: every `VSCODE_*` and `ELECTRON_*`
   variable is dropped, not only three
 
