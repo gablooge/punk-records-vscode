@@ -7,10 +7,8 @@ import * as path from "node:path";
 import { runTests } from "@vscode/test-electron";
 
 async function main(): Promise<void> {
-  // Run from inside VS Code (a terminal, or a tool its extensions start), the editor's own variables
-  // reach the downloaded VS Code: ELECTRON_RUN_AS_NODE starts it as plain Node, and with the rest
-  // (VSCODE_IPC_HOOK, VSCODE_ESM_ENTRYPOINT, ...) the suite never starts. Drop them all.
-  for (const k of Object.keys(process.env)) if (/^(VSCODE_|ELECTRON_)/.test(k)) delete process.env[k];
+  // Run from a VS Code terminal, these make the downloaded VS Code start as plain Node instead.
+  for (const k of ["ELECTRON_RUN_AS_NODE", "VSCODE_IPC_HOOK_CLI", "VSCODE_PID"]) delete process.env[k];
   const bin = process.env.PUNK_BIN || "punk";
   const tmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "punk-vscode-it-"))); // long path: Windows tmpdir can be 8.3 (RUNNER~1), punk reports it resolved
   // an empty file, not os.devNull: Git for Windows cannot read \\.\nul as a config file
