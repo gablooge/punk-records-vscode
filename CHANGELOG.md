@@ -18,8 +18,6 @@
 - The warning after a failed command no longer holds up the status bar refresh until it is closed
 - Remove duplicate lines: a `punk dedupe` that timed out no longer offers to remove duplicates it never
   found; it is reported as a failure
-- `npm run test:vscode` works when started from inside VS Code: every `VSCODE_*` and `ELECTRON_*`
-  variable is dropped, not only three
 
 ## 0.1.0 - 2026-11-22
 
