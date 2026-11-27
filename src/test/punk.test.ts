@@ -108,10 +108,13 @@ test("a run that times out is marked killed, not read as punk's exit 1", { skip:
 });
 
 test("dedupeResult: exit 1 means duplicates only when punk itself exited", () => {
-  const r = (code: number, killed = false) => ({ code, stdout: "", stderr: "", killed });
+  const found = "a/CLAUDE.md:3: - x\n\n1 duplicate line in 1 file; the first copy of each line is kept. Run `punk dedupe --apply` to remove them.\n";
+  const r = (code: number, killed = false, stdout = "", stderr = "") => ({ code, stdout, stderr, killed });
   assert.equal(dedupeResult(r(0)), "none");
-  assert.equal(dedupeResult(r(1)), "found");
+  assert.equal(dedupeResult(r(1, false, found)), "found");
+  assert.equal(dedupeResult(r(1, false, found.replace("1 duplicate line in 1 file", "12 duplicate lines in 3 files"))), "found");
   assert.equal(dedupeResult(r(1, true)), "failed"); // a timeout or signal is also code 1
+  assert.equal(dedupeResult(r(1, false, "", "Traceback (most recent call last):\nOSError: boom\n")), "failed"); // a crash
   assert.equal(dedupeResult(r(2)), "failed");
 });
 

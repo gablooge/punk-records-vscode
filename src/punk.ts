@@ -46,13 +46,18 @@ export interface RunResult {
 }
 
 /**
- * What `punk dedupe` (without --apply) found: exit 0 none, exit 1 duplicates listed on stdout.
- * Anything else, including a run killed by the timeout (which also reports code 1), is a failure.
+ * What `punk dedupe` (without --apply) found: exit 0 none, exit 1 with punk's summary line duplicates.
+ * Anything else is a failure: a run killed by the timeout (also code 1), a crash in punk (exit 1 with a
+ * traceback and no summary), or any other exit.
  */
 export function dedupeResult(r: RunResult): "none" | "found" | "failed" {
   if (r.killed) return "failed";
-  return r.code === 0 ? "none" : r.code === 1 ? "found" : "failed";
+  if (r.code === 0) return "none";
+  return r.code === 1 && DEDUPE_SUMMARY.test(r.stdout) ? "found" : "failed";
 }
+
+/** punk's dedupe summary (cli.py `cmd_dedupe`, the same in 0.4.0 to 0.6.2). */
+const DEDUPE_SUMMARY = /\d+ duplicate lines? in \d+ files?/;
 
 /** What a setup problem needs: install punk, upgrade it, or create a store. "other" is any other failure. */
 export type Problem = "missing" | "old" | "nostore" | "other";
