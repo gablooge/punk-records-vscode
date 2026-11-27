@@ -6,7 +6,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { before, test } from "node:test";
-import { Punk, PunkError } from "../punk";
+import { dedupeResult, Punk, PunkError } from "../punk";
 import { syncProblem } from "../syncProblem";
 
 const bin = process.env.PUNK_BIN || "punk";
@@ -105,6 +105,20 @@ test("a run that times out is marked killed, not read as punk's exit 1", { skip:
   assert.equal(r.killed, true);
   const ok = await new Punk(bin, store).run(["status"]);
   assert.equal(ok.killed, false);
+});
+
+test("dedupeResult: exit 1 means duplicates only when punk itself exited", () => {
+  const r = (code: number, killed = false) => ({ code, stdout: "", stderr: "", killed });
+  assert.equal(dedupeResult(r(0)), "none");
+  assert.equal(dedupeResult(r(1)), "found");
+  assert.equal(dedupeResult(r(1, true)), "failed"); // a timeout or signal is also code 1
+  assert.equal(dedupeResult(r(2)), "failed");
+});
+
+test("a dedupe that times out is a failure, not duplicates to remove", { skip: process.platform === "win32" && "uses a POSIX shell script" }, async () => {
+  const slow = path.join(tmp, "slow-dedupe.sh");
+  fs.writeFileSync(slow, "#!/bin/sh\nsleep 5\n", { mode: 0o755 });
+  assert.equal(dedupeResult(await new Punk(slow, undefined, 300).run(["dedupe"])), "failed");
 });
 
 // What `punk sync` prints for a problem that stays until a person acts, read by syncProblem().

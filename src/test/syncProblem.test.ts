@@ -86,3 +86,16 @@ test("showBlock: a block wins over the track step, not over install, upgrade or 
   for (const step of ["install", "upgrade", "init"] as const) assert.equal(showBlock(step, blocked), null);
   assert.equal(showBlock(null, null), null);
 });
+
+test("afterSync: exit 1 clears only when it is punk's file-conflict exit, not a crash", () => {
+  const blocked = syncProblem(res(2, MERGE));
+  const crash = "Traceback (most recent call last):\n  File \"punk\", line 1\nRuntimeError: boom\n";
+  assert.equal(afterSync(blocked, res(1, crash))?.kind, "merge");
+  assert.match(afterSync(blocked, res(1, crash))!.tooltip, /RuntimeError: boom/);
+  const conflicts = "\n1 file(s) need attention. Conflicts: see what differs with `punk diff`, then ...\n";
+  assert.equal(afterSync(blocked, res(1, conflicts, "! github.com/me/app/CLAUDE.md\n")), null);
+});
+
+test("the tooltip says which sync clears it", () => {
+  assert.match(syncProblem(res(2, AGE))!.tooltip, /until a sync from VS Code succeeds/);
+});

@@ -1,8 +1,8 @@
 import * as fs from "node:fs";
 import * as vscode from "vscode";
 import { memoryFile } from "./memories";
-import { Punk, PunkError, type Listing } from "./punk";
-import { installCommand, nextStep, setupStatus, type Step } from "./setup";
+import { dedupeResult, Punk, PunkError, type Listing } from "./punk";
+import { installCommand, menuItems, nextStep, setupStatus, type Step } from "./setup";
 import { StoreDocuments, SCHEME, storeUri } from "./storeDocs";
 import { summarize } from "./summary";
 import { afterSync, showBlock, syncProblem, type SyncProblem } from "./syncProblem";
@@ -172,7 +172,7 @@ async function runPunk(title: string, args: string[]): Promise<number> {
   output.appendLine(`$ punk ${args.join(" ")}`);
   if (r.stdout) output.append(r.stdout);
   if (r.stderr) output.append(r.stderr);
-  output.appendLine(r.killed ? "(stopped before it finished: timeout or signal)" : `(exit ${r.code})`);
+  output.appendLine(r.killed ? "(no exit code: stopped by the timeout or a signal, or could not start)" : `(exit ${r.code})`);
   const sameStore = used.executable === punk.executable && used.home === punk.home;
   if (args[0] === "sync" && sameStore) syncBlock = afterSync(syncBlock, r); // not about another store
   if (r.code === 0) {
@@ -229,12 +229,14 @@ async function diff(node?: Node): Promise<void> {
 
 async function dedupe(): Promise<void> {
   const r = await punk.run(["dedupe"]);
-  if (r.code === 0) {
+  const result = dedupeResult(r);
+  if (result === "none") {
     vscode.window.showInformationMessage("Punk Records: no duplicate lines.");
     return;
   }
-  if (r.code !== 1) {
-    vscode.window.showWarningMessage(`punk dedupe: ${(r.stderr || r.stdout).trim()}`);
+  if (result === "failed") {
+    const why = (r.stderr || r.stdout).trim() || (r.killed ? "no exit code (stopped by the timeout or a signal, or could not start)" : `exit ${r.code}`);
+    vscode.window.showWarningMessage(`punk dedupe: ${why}`);
     return;
   }
   output.appendLine("$ punk dedupe");
@@ -256,14 +258,7 @@ async function open(node: Node): Promise<void> {
 }
 
 async function menu(): Promise<void> {
-  const actions: [string, string][] = [
-    ["$(cloud-upload) Save memories", "punkRecords.save"],
-    ["$(sync) Sync", "punkRecords.sync"],
-    ["$(cloud-download) Restore memories", "punkRecords.restore"],
-    ["$(diff) Compare with store", "punkRecords.diff"],
-    ["$(filter) Remove duplicate lines", "punkRecords.dedupe"],
-    ["$(output) Show output", "punkRecords.showOutput"],
-  ];
+  const actions = menuItems(step);
   const pick = await vscode.window.showQuickPick(actions.map(([label, command]) => ({ label, command })), {
     placeHolder: statusItem.tooltip?.toString().split("\n")[0],
   });

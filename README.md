@@ -9,7 +9,8 @@ syncs your AI agent memories (`CLAUDE.md`, `AGENTS.md`, napkins, rules) across p
 
 - **Status bar.** `✓ punk` when everything is saved and restored; otherwise how many memories wait to
   be saved or restored, or how many conflicts need you. Click it for the actions. When a sync is
-  blocked until you act, it says so and stays until a sync succeeds: `punk: sync blocked` (the store
+  blocked until you act, it says so and stays until a sync from VS Code succeeds (a `punk sync` in a
+  terminal or a session hook does not clear it): `punk: sync blocked` (the store
   and its remote both changed the same files), `punk: wrong remote` (the remote is not a Punk Records
   store) or `punk: needs age` (an encrypted store without `age` installed). The tooltip says what to do.
 - **Commands** (Command Palette, "Punk Records: ..."): Save memories, Sync, Restore memories,

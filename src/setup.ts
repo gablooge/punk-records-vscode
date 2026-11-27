@@ -27,3 +27,16 @@ export function setupStatus(step: Step, detail: string): { text: string; tooltip
 export function installCommand(step: "install" | "upgrade"): string {
   return step === "install" ? "pipx install punk-records" : "pipx upgrade punk-records";
 }
+
+/** The status bar menu: [label, command]. Track comes first while it is the pending step. */
+export function menuItems(step: Step | null): [string, string][] {
+  const items: [string, string][] = [
+    ["$(cloud-upload) Save memories", "punkRecords.save"],
+    ["$(sync) Sync", "punkRecords.sync"],
+    ["$(cloud-download) Restore memories", "punkRecords.restore"],
+    ["$(diff) Compare with store", "punkRecords.diff"],
+    ["$(filter) Remove duplicate lines", "punkRecords.dedupe"],
+    ["$(output) Show output", "punkRecords.showOutput"],
+  ];
+  return step === "track" ? [["$(add) Track this folder", "punkRecords.track"], ...items] : items;
+}

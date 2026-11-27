@@ -46,13 +46,14 @@ function make(kind: SyncProblemKind, message: string, latest: string | null): Sy
   const k = KINDS.find((x) => x.kind === kind)!;
   const parts = [k.summary, message];
   if (latest) parts.push(`The last sync failed with another error:\n${latest}`);
-  parts.push("This stays until a sync succeeds.");
+  parts.push("This stays until a sync from VS Code succeeds.");
   return { kind, text: k.text, tooltip: parts.join("\n\n"), message, latest };
 }
 
 /**
  * A problem that stays until a person acts, from a `punk sync` result; null for anything else.
- * Exit 0 and 1 mean the remote exchange went through (1 is file conflicts, which `punk status` shows).
+ * Exit 0, and exit 1 with punk's "file(s) need attention" (file conflicts, which `punk status` shows),
+ * mean the remote exchange went through. A crash in punk also exits 1, with a traceback.
  * Exit 2 is any punk error: only the kinds above are lasting. A remote that cannot be reached is not,
  * since the next sync may get past it; it stays a one-off warning, as in `punk session`.
  */
@@ -70,11 +71,15 @@ export function syncProblem(r: RunResult): SyncProblem | null {
  */
 export function afterSync(previous: SyncProblem | null, r: RunResult): SyncProblem | null {
   if (r.killed) return previous;
-  if (r.code === 0 || r.code === 1) return null;
+  if (r.code === 0 || (r.code === 1 && FILE_CONFLICTS.test(r.stderr))) return null;
   const now = syncProblem(r);
   if (now || !previous) return now;
-  return make(previous.kind, previous.message, messageOf(r) || `exit ${r.code}`);
+  const latest = messageOf(r).split("\n").slice(-5).join("\n"); // a traceback's last lines say what failed
+  return make(previous.kind, previous.message, latest || `exit ${r.code}`);
 }
+
+/** What punk's own exit 1 prints (cli.py `_report`), after the exchange with the remote worked. */
+const FILE_CONFLICTS = /\d+ file\(s\) need attention/;
 
 /** The block to show: over a suggestion to track a folder, but not while punk itself is not ready. */
 export function showBlock(step: Step | null, block: SyncProblem | null): SyncProblem | null {

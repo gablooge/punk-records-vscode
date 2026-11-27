@@ -41,8 +41,17 @@ export interface RunResult {
   code: number;
   stdout: string;
   stderr: string;
-  /** Killed (timeout or signal) before punk exited: `code` is then 1, not punk's own exit code. */
+  /** No exit code (killed by the timeout or a signal, or could not start): `code` is then 1, not punk's. */
   killed?: boolean;
+}
+
+/**
+ * What `punk dedupe` (without --apply) found: exit 0 none, exit 1 duplicates listed on stdout.
+ * Anything else, including a run killed by the timeout (which also reports code 1), is a failure.
+ */
+export function dedupeResult(r: RunResult): "none" | "found" | "failed" {
+  if (r.killed) return "failed";
+  return r.code === 0 ? "none" : r.code === 1 ? "found" : "failed";
 }
 
 /** What a setup problem needs: install punk, upgrade it, or create a store. "other" is any other failure. */
