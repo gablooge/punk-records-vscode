@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 import { test } from "node:test";
-import { installCommand, nextStep, setupStatus } from "../setup";
+import { installCommand, menuItems, nextStep, setupStatus } from "../setup";
 
 test("each setup problem has its step", () => {
   assert.equal(nextStep("missing", 0), "install");
@@ -28,4 +28,12 @@ test("status bar text and tooltip while setting up", () => {
 test("install commands are fixed text", () => {
   assert.equal(installCommand("install"), "pipx install punk-records");
   assert.equal(installCommand("upgrade"), "pipx upgrade punk-records");
+});
+
+test("the actions menu offers Track while that step is pending", () => {
+  const ids = (step: Parameters<typeof menuItems>[0]) => menuItems(step).map(([, command]) => command);
+  assert.equal(ids("track")[0], "punkRecords.track");
+  assert.ok(!ids(null).includes("punkRecords.track"));
+  assert.ok(ids(null).includes("punkRecords.sync"));
+  assert.deepEqual(ids("track").slice(1), ids(null));
 });

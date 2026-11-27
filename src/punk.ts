@@ -41,7 +41,23 @@ export interface RunResult {
   code: number;
   stdout: string;
   stderr: string;
+  /** No exit code (killed by the timeout or a signal, or could not start): `code` is then 1, not punk's. */
+  killed?: boolean;
 }
+
+/**
+ * What `punk dedupe` (without --apply) found: exit 0 none, exit 1 with punk's summary line duplicates.
+ * Anything else is a failure: a run killed by the timeout (also code 1), a crash in punk (exit 1 with a
+ * traceback and no summary), or any other exit.
+ */
+export function dedupeResult(r: RunResult): "none" | "found" | "failed" {
+  if (r.killed) return "failed";
+  if (r.code === 0) return "none";
+  return r.code === 1 && DEDUPE_SUMMARY.test(r.stdout) ? "found" : "failed";
+}
+
+/** punk's dedupe summary (cli.py `cmd_dedupe`, the same in 0.4.0 to 0.6.2). */
+const DEDUPE_SUMMARY = /\d+ duplicate lines? in \d+ files?/;
 
 /** What a setup problem needs: install punk, upgrade it, or create a store. "other" is any other failure. */
 export type Problem = "missing" | "old" | "nostore" | "other";
@@ -87,8 +103,10 @@ export class Punk {
             );
             return;
           }
-          const code = e ? (typeof e.code === "number" ? e.code : 1) : 0;
-          resolve({ code, stdout: String(stdout), stderr: String(stderr) });
+          const exit = e ? (e.code as unknown) : 0;
+          const killed = typeof exit !== "number"; // a timeout or signal: no exit code
+          const code = typeof exit === "number" ? exit : 1;
+          resolve({ code, stdout: String(stdout), stderr: String(stderr), killed });
         },
       );
     });

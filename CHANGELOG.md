@@ -8,6 +8,16 @@
 - Untracked workspace folders appear as "Track <folder>" at the top of the view
 - A refresh asked for while another runs now runs again afterwards, so it reflects settings changed
   in between
+- A sync that stays blocked until you act is shown in the status bar (warning background) until a
+  sync from VS Code succeeds, instead of only a warning that is gone once closed: `punk: sync blocked`
+  (the store and its remote both changed the same files), `punk: wrong remote` (not a Punk Records
+  store, punk 0.6.2+) or `punk: needs age` (encrypted store, `age` not installed). The tooltip says
+  what to do, then punk's own message, and any different error from a later sync. A remote that
+  cannot be reached stays a one-off warning. A sync that times out or crashes does not clear it
+- While "Track this folder" is pending, the status bar menu offers it too
+- The warning after a failed command no longer holds up the status bar refresh until it is closed
+- Remove duplicate lines: a `punk dedupe` that timed out no longer offers to remove duplicates it never
+  found; it is reported as a failure
 
 ## 0.1.0 - 2026-11-22
 

@@ -6,7 +6,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { before, test } from "node:test";
-import { Punk, PunkError } from "../punk";
+import { dedupeResult, Punk, PunkError } from "../punk";
+import { syncProblem } from "../syncProblem";
 
 const bin = process.env.PUNK_BIN || "punk";
 let available = false;
@@ -95,4 +96,100 @@ test("a punk without --json says to upgrade", { skip: process.platform === "win3
   await assert.rejects(new Punk(fake).status(), (e: PunkError) =>
     /punk 0\.4\.0 or newer is needed/.test(e.message) && /pipx upgrade punk-records/.test(e.message) && !/usage:/.test(e.message) &&
     e.problem === "old");
+});
+
+test("a run that times out is marked killed, not read as punk's exit 1", { skip: process.platform === "win32" && "uses a POSIX shell script" }, async () => {
+  const slow = path.join(tmp, "slow-punk.sh");
+  fs.writeFileSync(slow, "#!/bin/sh\nsleep 5\n", { mode: 0o755 });
+  const r = await new Punk(slow, undefined, 300).run(["sync"]);
+  assert.equal(r.killed, true);
+  const ok = await new Punk(bin, store).run(["status"]);
+  assert.equal(ok.killed, false);
+});
+
+test("dedupeResult: exit 1 means duplicates only when punk itself exited", () => {
+  const found = "a/CLAUDE.md:3: - x\n\n1 duplicate line in 1 file; the first copy of each line is kept. Run `punk dedupe --apply` to remove them.\n";
+  const r = (code: number, killed = false, stdout = "", stderr = "") => ({ code, stdout, stderr, killed });
+  assert.equal(dedupeResult(r(0)), "none");
+  assert.equal(dedupeResult(r(1, false, found)), "found");
+  assert.equal(dedupeResult(r(1, false, found.replace("1 duplicate line in 1 file", "12 duplicate lines in 3 files"))), "found");
+  assert.equal(dedupeResult(r(1, true)), "failed"); // a timeout or signal is also code 1
+  assert.equal(dedupeResult(r(1, false, "", "Traceback (most recent call last):\nOSError: boom\n")), "failed"); // a crash
+  assert.equal(dedupeResult(r(2)), "failed");
+});
+
+test("a dedupe that times out is a failure, not duplicates to remove", { skip: process.platform === "win32" && "uses a POSIX shell script" }, async () => {
+  const slow = path.join(tmp, "slow-dedupe.sh");
+  fs.writeFileSync(slow, "#!/bin/sh\nsleep 5\n", { mode: 0o755 });
+  assert.equal(dedupeResult(await new Punk(slow, undefined, 300).run(["dedupe"])), "failed");
+});
+
+// What `punk sync` prints for a problem that stays until a person acts, read by syncProblem().
+// Each needs the punk that first printed it; older punk skips.
+const punkVersion = (() => {
+  try {
+    const m = /(\d+)\.(\d+)\.(\d+)/.exec(execFileSync(bin, ["--version"], { encoding: "utf8" }));
+    return m ? [+m[1], +m[2], +m[3]] : [0, 0, 0];
+  } catch {
+    return [0, 0, 0];
+  }
+})();
+const needs = (v: [number, number, number]) => {
+  if (!available) return skip;
+  const older = punkVersion[0] - v[0] || punkVersion[1] - v[1] || punkVersion[2] - v[2];
+  return older < 0 ? `needs punk ${v.join(".")} or newer (found ${punkVersion.join(".")})` : false;
+};
+let ageOnPath = true;
+try {
+  execFileSync("age", ["--version"], { stdio: "ignore" });
+} catch (e) {
+  ageOnPath = (e as NodeJS.ErrnoException).code !== "ENOENT";
+}
+
+test("sync: a store that cannot merge its remote", { skip: needs([0, 6, 1]) }, async () => {
+  const remote = path.join(tmp, "merge-remote.git");
+  sh("git", ["init", "-q", "--bare", remote]);
+  const a = path.join(tmp, "merge-a");
+  const b = path.join(tmp, "merge-b");
+  sh("git", ["clone", "-q", store, a]); // a copy of the test store, so both share its history
+  sh("git", ["remote", "set-url", "origin", remote], a);
+  sh("git", ["push", "-q", "origin", "HEAD:main"], a);
+  sh(bin, ["--home", b, "init", "--no-global", "--machine", "b", remote]);
+  const sat = path.join("satellites", "github.com", "me", "app.json");
+  for (const [dir, name] of [[a, "from-a"], [b, "from-b"]]) {
+    const f = path.join(dir, sat);
+    fs.writeFileSync(f, JSON.stringify({ ...JSON.parse(fs.readFileSync(f, "utf8")), name }));
+    sh("git", ["commit", "-qam", name], dir);
+  }
+  sh("git", ["push", "-q", "origin", "HEAD:main"], a);
+  const r = await new Punk(bin, b).run(["sync"]);
+  assert.equal(r.code, 2, r.stderr);
+  assert.equal(syncProblem(r)?.kind, "merge", r.stderr);
+});
+
+test("sync: a remote that is not a punk store", { skip: needs([0, 6, 2]) }, async () => {
+  const other = path.join(tmp, "other.git");
+  const work = path.join(tmp, "other-work");
+  sh("git", ["init", "-q", "--bare", other]);
+  fs.mkdirSync(work);
+  sh("git", ["init", "-q"], work);
+  fs.writeFileSync(path.join(work, "README.md"), "not a store\n");
+  sh("git", ["add", "-A"], work);
+  sh("git", ["commit", "-qm", "x"], work);
+  sh("git", ["push", "-q", other, "HEAD:main"], work);
+  const s = path.join(tmp, "store-wrong-remote");
+  sh(bin, ["--home", s, "init", "--no-global", "--machine", "w"]);
+  sh("git", ["remote", "add", "origin", other], s);
+  const r = await new Punk(bin, s).run(["sync"]);
+  assert.equal(r.code, 2, r.stderr);
+  assert.equal(syncProblem(r)?.kind, "notstore", r.stderr);
+});
+
+test("sync: an encrypted store without age", { skip: needs([0, 6, 1]) || (ageOnPath && "age is on PATH") }, async () => {
+  const s = path.join(tmp, "store-encrypted");
+  sh(bin, ["--home", s, "init", "--no-global", "--machine", "e"]);
+  sh("git", ["init", "-q", "--bare", path.join(s, ".git", "punk-crypt")]); // what punk checks to call a store encrypted
+  const r = await new Punk(bin, s).run(["sync"]);
+  assert.equal(r.code, 2, r.stderr);
+  assert.equal(syncProblem(r)?.kind, "age", r.stderr);
 });

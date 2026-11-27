@@ -1,10 +1,11 @@
 import * as fs from "node:fs";
 import * as vscode from "vscode";
 import { memoryFile } from "./memories";
-import { Punk, PunkError, type Listing } from "./punk";
-import { installCommand, nextStep, setupStatus, type Step } from "./setup";
+import { dedupeResult, Punk, PunkError, type Listing } from "./punk";
+import { installCommand, menuItems, nextStep, setupStatus, type Step } from "./setup";
 import { StoreDocuments, SCHEME, storeUri } from "./storeDocs";
 import { summarize } from "./summary";
+import { afterSync, showBlock, syncProblem, type SyncProblem } from "./syncProblem";
 import { MemoriesTree, type Node } from "./tree";
 
 let punk: Punk;
@@ -17,6 +18,8 @@ let refreshing: Promise<void> | null = null;
 let queued: Promise<void> | null = null;
 let step: Step | null = null;
 let terminal: vscode.Terminal | undefined;
+/** A lasting problem from the last `punk sync` (cannot merge the remote, age missing); null after one succeeds. */
+let syncBlock: SyncProblem | null = null;
 const pendingSaves = new Map<string, NodeJS.Timeout>();
 
 function config() {
@@ -31,6 +34,7 @@ function config() {
 
 function configure(): void {
   const c = config();
+  if (punk && (punk.executable !== c.executable || punk.home !== c.home)) syncBlock = null; // about another store
   punk = new Punk(c.executable, c.home);
   if (timer) clearInterval(timer);
   timer = c.refreshSeconds > 0 ? setInterval(() => void refresh(), c.refreshSeconds * 1000) : undefined;
@@ -55,10 +59,14 @@ function refresh(): Promise<void> {
       tree.update(list, null, untrackedFolders(list));
       setStep(nextStep(null, list.satellites.filter((s) => s.kind !== "global").length));
       const s = step ? setupStatus(step, "") : summarize(status);
-      statusItem.text = s.text;
-      statusItem.tooltip = s.tooltip;
+      const blocked = showBlock(step, syncBlock);
+      if (blocked) statusItem.command = "punkRecords.menu"; // to sync again, even while "track" is suggested
+      statusItem.text = blocked ? blocked.text : s.text;
+      statusItem.tooltip = blocked ? `${blocked.tooltip}\n\n${s.tooltip}` : s.tooltip;
       statusItem.backgroundColor =
-        !step && summarize(status).state === "conflict" ? new vscode.ThemeColor("statusBarItem.warningBackground") : undefined;
+        blocked || (!step && summarize(status).state === "conflict")
+          ? new vscode.ThemeColor("statusBarItem.warningBackground")
+          : undefined;
     } catch (e) {
       const msg = (e as Error).message;
       listing = null;
@@ -156,21 +164,30 @@ async function setup(): Promise<void> {
 
 /** Run a punk command with a progress notification; show output and problems. */
 async function runPunk(title: string, args: string[]): Promise<number> {
+  const used = punk; // settings may change while it runs
   const r = await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Punk Records: ${title}` },
-    () => punk.run(args),
+    () => used.run(args),
   );
   output.appendLine(`$ punk ${args.join(" ")}`);
   if (r.stdout) output.append(r.stdout);
   if (r.stderr) output.append(r.stderr);
-  output.appendLine(`(exit ${r.code})`);
+  output.appendLine(r.killed ? "(no exit code: stopped by the timeout or a signal, or could not start)" : `(exit ${r.code})`);
+  const sameStore = used.executable === punk.executable && used.home === punk.home;
+  if (args[0] === "sync" && sameStore) syncBlock = afterSync(syncBlock, r); // not about another store
   if (r.code === 0) {
     const first = r.stdout.trim().split("\n")[0];
     vscode.window.setStatusBarMessage(`$(check) punk ${args[0]}: ${first || "done"}`, 4000);
   } else {
-    const msg = (r.stderr || r.stdout).trim().split("\n").slice(-3).join(" ") || `exit ${r.code}`;
-    const pick = await vscode.window.showWarningMessage(`punk ${args[0]}: ${msg}`, "Show output");
-    if (pick) output.show(true);
+    const problem = args[0] === "sync" ? syncProblem(r) : null; // this run's, not one kept from before
+    const msg = problem
+      ? problem.tooltip.split("\n")[0]
+      : (r.stderr || r.stdout).trim().split("\n").slice(-3).join(" ") || `exit ${r.code}`;
+    // Not awaited: the promise settles only when the message is closed, and until then the status
+    // bar would not refresh (and the command would not return: the integration test hung on Linux).
+    void vscode.window.showWarningMessage(`punk ${args[0]}: ${msg}`, "Show output").then((pick) => {
+      if (pick) output.show(true);
+    });
   }
   await refresh();
   return r.code;
@@ -212,12 +229,14 @@ async function diff(node?: Node): Promise<void> {
 
 async function dedupe(): Promise<void> {
   const r = await punk.run(["dedupe"]);
-  if (r.code === 0) {
+  const result = dedupeResult(r);
+  if (result === "none") {
     vscode.window.showInformationMessage("Punk Records: no duplicate lines.");
     return;
   }
-  if (r.code !== 1) {
-    vscode.window.showWarningMessage(`punk dedupe: ${(r.stderr || r.stdout).trim()}`);
+  if (result === "failed") {
+    const why = (r.stderr || r.stdout).trim() || (r.killed ? "no exit code (stopped by the timeout or a signal, or could not start)" : `exit ${r.code}`);
+    vscode.window.showWarningMessage(`punk dedupe: ${why}`);
     return;
   }
   output.appendLine("$ punk dedupe");
@@ -239,14 +258,7 @@ async function open(node: Node): Promise<void> {
 }
 
 async function menu(): Promise<void> {
-  const actions: [string, string][] = [
-    ["$(cloud-upload) Save memories", "punkRecords.save"],
-    ["$(sync) Sync", "punkRecords.sync"],
-    ["$(cloud-download) Restore memories", "punkRecords.restore"],
-    ["$(diff) Compare with store", "punkRecords.diff"],
-    ["$(filter) Remove duplicate lines", "punkRecords.dedupe"],
-    ["$(output) Show output", "punkRecords.showOutput"],
-  ];
+  const actions = menuItems(step);
   const pick = await vscode.window.showQuickPick(actions.map(([label, command]) => ({ label, command })), {
     placeHolder: statusItem.tooltip?.toString().split("\n")[0],
   });
@@ -277,7 +289,15 @@ function onSave(doc: vscode.TextDocument): void {
 /** Returned from activate() so the integration test can see what the user would see. */
 export interface TestApi {
   refresh(): Promise<void>;
-  snapshot(): { text: string; tooltip: string; satellites: string[]; subscriptions: string[]; setup: string | null };
+  snapshot(): {
+    text: string;
+    tooltip: string;
+    satellites: string[];
+    subscriptions: string[];
+    setup: string | null;
+    syncProblem: string | null;
+    warning: boolean;
+  };
 }
 
 export function activate(context: vscode.ExtensionContext): TestApi {
@@ -329,6 +349,8 @@ export function activate(context: vscode.ExtensionContext): TestApi {
       satellites: (listing?.satellites ?? []).map((s) => s.id),
       subscriptions: (listing?.subscriptions ?? []).map((s) => s.name),
       setup: step,
+      syncProblem: syncBlock?.kind ?? null,
+      warning: statusItem.backgroundColor !== undefined,
     }),
   };
 }
